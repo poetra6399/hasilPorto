@@ -1,0 +1,229 @@
+/*
+ # This sample code is used to test the pH meter Pro V1.0.
+ # Editor : YouYou
+ # Ver    : 1.0
+ # Product: analog pH meter Pro
+ # SKU    : SEN0169
+*/
+#define SensorPin A0            //pH meter Analog output to Arduino Analog Input 0
+#define Offset -6.95            //deviation compensate
+#define LED 13
+#define samplingInterval 20
+#define printInterval 800
+#define ArrayLenth  40    //times of collection
+int pHArray[ArrayLenth];   //Store the average value of the sensor feedback
+int pHArrayIndex=0;    
+// Kodingan Asli
+#include <LCD.h>
+#include <LiquidCrystal.h>
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+#include<DallasTemperature.h>
+#include<OneWire.h>
+#define sensor A0
+#define alarm 52
+#define led 53
+#define ONE_WIRE_BUS 2
+// Buat objek
+LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
+OneWire oneWire(ONE_WIRE_BUS); 
+DallasTemperature sensors(&oneWire);
+
+
+
+void setup(void)
+{
+  pinMode(LED,OUTPUT);  
+  Serial.begin(9600);  
+  Serial.println("pH meter experiment!");    //Test the serial monitor
+// Tentukan ukuran LCD
+  Wire.begin();
+  lcd.backlight();  //open the backlight 
+  Serial.begin(9600);
+  lcd.begin(20,4);
+  // Start up the library 
+  sensors.begin();
+  pinMode(LED,OUTPUT);
+  pinMode (sensor,INPUT);
+  pinMode(alarm, OUTPUT);
+  pinMode(led, OUTPUT);
+  //Serial.print("volt");
+
+  
+  lcd.setCursor(0,3);
+  lcd.print("pH: ");
+  lcd.setCursor(8,3);
+  lcd.print("~");
+  lcd.setCursor(9,3);
+  lcd.print("Suhu: ");
+  
+
+
+}
+void loop(void)
+{
+  int sensorValue;
+    int m;
+    long sensorSum;
+    float v;
+    float t;
+    float a,GAP;
+  //suhu
+   sensors.requestTemperatures();
+   //t = lcd.print(sensors.getTempCByIndex(0));
+  delay(1000);
+
+
+  
+  static unsigned long samplingTime = millis();
+  static unsigned long printTime = millis();
+  static float pHValue,voltage;
+  if(millis()-samplingTime > samplingInterval)
+  {
+      pHArray[pHArrayIndex++]=analogRead(SensorPin);
+      if(pHArrayIndex==ArrayLenth)pHArrayIndex=0;
+      voltage = avergearray(pHArray, ArrayLenth)*5.0/1024;
+      pHValue = 3.5*voltage+Offset;
+      samplingTime=millis();
+  }
+  if(millis() - printTime > printInterval)   //Every 800 milliseconds, print a numerical, convert the state of the LED indicator
+  {
+  Serial.print("Voltage:");
+        Serial.print(voltage,2);
+        Serial.print("    pH value: ");
+  Serial.println(pHValue,2);
+        digitalWrite(LED,digitalRead(LED)^1);
+        printTime=millis();
+  }
+  GAP=pHValue-7;
+  if (GAP>0){
+  pHValue=7-GAP;
+  }
+  else {
+    pHValue=7+GAP;
+  }
+//Sensor pH tidak normal, Alarm Bunyi
+if(pHValue < 6.50){
+    //digitalWrite(alarm,HIGH);
+    digitalWrite(led,HIGH);
+    delay(500);
+    digitalWrite(led,LOW);
+    delay(500);
+    lcd.setCursor(4,3);
+    lcd.print("pH-");
+    }
+else if(pHValue > 7.50){
+    //digitalWrite(alarm,HIGH);
+    digitalWrite(led,HIGH);
+    delay(1000);
+    digitalWrite(led,LOW);
+    delay(1000);
+    lcd.setCursor(4,3);
+    lcd.print("pH+");
+    }
+
+//Sensor pH normal, Alarm OFF    
+else if(6.50 < pHValue < 7.50){
+  //digitalWrite(alarm,LOW);
+  digitalWrite(led,LOW);
+  lcd.setCursor(4,3);
+  lcd.print("OK ");
+}
+//Sensor Suhu Tidak normal Alarm ON    
+if(sensors.getTempCByIndex(0) < 25){
+  //digitalWrite(alarm, HIGH);
+  digitalWrite(led, HIGH);
+  delay(500);
+  digitalWrite(led,LOW);
+  delay(500);
+  digitalWrite(led,LOW);
+  lcd.setCursor(15,3);
+  lcd.print("SUHU-");
+  }
+else if(sensors.getTempCByIndex(0) >30){
+  //digitalWrite(alarm, HIGH);
+  digitalWrite(led, HIGH);
+  delay(250);
+  digitalWrite(led,LOW);
+  delay(250);
+  digitalWrite(led,HIGH);
+  lcd.setCursor(15,3);
+  lcd.print("SUHU+");
+  }
+else if(30 < sensors.getTempCByIndex(0) < 35){
+  //digitalWrite(alarm,LOW);
+  digitalWrite(led,LOW);
+  lcd.setCursor(15,3);
+  lcd.print("OK   ");
+  }
+
+  lcd.setCursor(0,0);
+  lcd.print("---  SMART KOGU  ---");
+  
+    
+    lcd.setCursor(0,1); // kolom,baris
+    lcd.print("Nilai pH : ");
+    //Serial.print ("PH");
+    lcd.print(pHValue);
+    //Serial.println(a);
+    
+    //lcd.setCursor(0,1);
+    //lcd.print("Volt adalah : ");
+    //lcd.print(v);
+    //Serial.println(v);
+
+    //Serial.print("Volt");
+    //Serial.println(v);
+    //delay(1000);
+    
+    //lcd.setCursor(0,2);
+    //lcd.print("Temp adalah : ");
+    //lcd.print(t);
+    lcd.setCursor(0,2);
+    lcd.print("Temp: ");
+    lcd.print(sensors.getTempCByIndex(0));
+    lcd.print(" Celcius");
+    Serial.println(t);
+    }
+
+
+double avergearray(int* arr, int number){
+  int i;
+  int max,min;
+  double avg;
+  long amount=0;
+  if(number<=0){
+    Serial.println("Error number for the array to avraging!/n");
+    return 0;
+  }
+  if(number<5){   //less than 5, calculated directly statistics
+    for(i=0;i<number;i++){
+      amount+=arr[i];
+    }
+    avg = amount/number;
+    return avg;
+  }else{
+    if(arr[0]<arr[1]){
+      min = arr[0];max=arr[1];
+    }
+    else{
+      min=arr[1];max=arr[0];
+    }
+    for(i=2;i<number;i++){
+      if(arr[i]<min){
+        amount+=min;        //arr<min
+        min=arr[i];
+      }else {
+        if(arr[i]>max){
+          amount+=max;    //arr>max
+          max=arr[i];
+        }else{
+          amount+=arr[i]; //min<=arr<=max
+        }
+      }//if
+    }//for
+    avg = (double)amount/(number-2);
+  }//if
+  return avg;
+
+}
